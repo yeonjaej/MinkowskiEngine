@@ -73,7 +73,19 @@ if __name__ == '__main__':
 
         # Get new data
         coords, feat, label = data_loader()
-        input = ME.SparseTensor(feat, coords, device=device)
+
+
+#    coordinates,
+#    features=None,
+#    labels=None,
+#    ignore_label=-100,
+#    return_index=False,
+#    return_inverse=False,
+#    return_maps_only=False,
+#    quantization_size=None,
+#    device="cpu",
+
+        input = ME.SparseTensor(features=feat, coordinates=coords, device=device)
         label = label.to(device)
 
         # Forward

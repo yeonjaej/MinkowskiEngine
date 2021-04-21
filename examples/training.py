@@ -72,7 +72,7 @@ def plot(C, L):
     plt.show()
 
 
-class RandomLineDataset(Dataset):
+class NnbarClusterDataset(Dataset):
 
     # Warning: read using mutable obects for default input arguments in python.
     def __init__(
@@ -135,10 +135,23 @@ class RandomLineDataset(Dataset):
             [np.ones((self.num_data, 1)),
              np.zeros((self.num_noise, 1))]).astype(np.int32)
 
+#    coordinates,                                                                                                                                                                   
+#    features=None,                                                                                                                                                                 
+#    labels=None,                                                                                                                                                                   
+#    ignore_label=-100,                                                                                                                                                             
+#    return_index=False,                                                                                                                                                            
+#    return_inverse=False,                                                                                                                                                          
+#    return_maps_only=False,                                                                                                                                                        
+#    quantization_size=None,                                                                                                                                                        
+#    device="cpu",  
+
+
+# sparse_quantize() function was broken, arguments names were changed to coord -> coordinates, etc.
+
         # Quantize the input
         discrete_coords, unique_feats, unique_labels = ME.utils.sparse_quantize(
-            coords=input,
-            feats=feats,
+            coordinates=input,
+            features=feats,
             labels=labels,
             quantization_size=self.quantization_size,
             ignore_label=-100)
@@ -198,7 +211,7 @@ def main(config):
             coords, feats, labels = data
             out = net(ME.SparseTensor(feats.float(), coords))
             optimizer.zero_grad()
-            loss = criterion(out.F.squeeze(), labels.long())
+            loss = criterion(out.F.squeeze(), torch.max(labels, 1)[1])#labels.long())
             loss.backward()
             optimizer.step()
 

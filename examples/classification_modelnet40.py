@@ -325,7 +325,7 @@ def train(net, device, config):
 if __name__ == "__main__":
     config = parser.parse_args()
     seed_all(config.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")# changed "cuda" to "cuda:0"
     print("===================ModelNet40 Dataset===================")
     print(f"Training with translation {config.translation}")
     print(f"Evaluating with translation {config.test_translation}")
