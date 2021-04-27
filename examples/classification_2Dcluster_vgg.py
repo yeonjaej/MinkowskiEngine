@@ -42,13 +42,13 @@ from examples.common import seed_all
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--voxel_size", type=float, default=0.05)
-parser.add_argument("--max_steps", type=int, default=100)
+parser.add_argument("--max_steps", type=int, default=200)
 parser.add_argument("--val_freq", type=int, default=5)
-parser.add_argument("--batch_size", default=2, type=int)
-parser.add_argument("--lr", default=1e-1, type=float)
-parser.add_argument("--weight_decay", type=float, default=1e-4)
+parser.add_argument("--batch_size", default=64, type=int)
+parser.add_argument("--lr", default=1e-2, type=float)
+parser.add_argument("--weight_decay", type=float, default=1e-5)
 parser.add_argument("--num_workers", type=int, default=2)
-parser.add_argument("--stat_freq", type=int, default=100)
+parser.add_argument("--stat_freq", type=int, default=10)
 parser.add_argument("--weights", type=str, default="modelnet.pth")
 parser.add_argument("--seed", type=int, default=777)
 parser.add_argument("--translation", type=float, default=0.2)
@@ -132,6 +132,7 @@ class clusterCNN(ME.MinkowskiNetwork):
             self.get_mlp_block(512, 512),
             ME.MinkowskiDropout(),
             self.get_mlp_block(512, 512),
+            self.get_mlp_block(512, 2),
             #ME.MinkowskiFunctional.softmax(),
         )
     def weight_initialization(self):
@@ -183,7 +184,7 @@ class nnbarDataset(Dataset):
         self.phase = phase
 
     def load_data(self, data_root, phase):
-        print("In load_data")
+        #print("In load_data")
         w_xy, w_val, labels = [], [], []
         assert os.path.exists(data_root), f"{data_root} does not exist"
         files = glob.glob(os.path.join(data_root, "*_%s*.npy" % phase))
@@ -195,9 +196,9 @@ class nnbarDataset(Dataset):
             #print("f")
             w_xy.extend(a[:,10:12])
             w_val.extend(a[:,12])
-            print("data extent")
+            #print("data extent")
             labels.extend(a[:,20].astype("int64"))
-            print("labels extent")
+            #print("labels extent")
 
         w_xy = np.stack(w_xy, axis=0)
         #w_val = np.stack(w_val, axis=0)
@@ -215,7 +216,7 @@ class nnbarDataset(Dataset):
         #    np.random.shuffle(w_xy)
         label = self.label[i]
         w_val = torch.from_numpy(np.asarray(w_val))
-        print("in getitem")
+        #print("in getitem")
 
         #print("before padding")
 
@@ -240,7 +241,7 @@ class nnbarDataset(Dataset):
         w_xy = np.dstack((w_x,w_y))
         w_xy = np.reshape(w_xy, (4096,2))
         #print(w_xy)
-        print(w_xy.shape)
+        #print(w_xy.shape)
         w_xy = torch.from_numpy(np.asarray(w_xy))
         
         label = np.reshape(label, (1))
@@ -271,11 +272,11 @@ def make_data_loader_custom(phase, config):
     dataset = nnbarDataset(
         phase=phase,
     )
-    print(dataset)
+    #print(dataset)
     return DataLoader(
         dataset,
         num_workers=config.num_workers,
-        #shuffle = is_train,
+        shuffle = is_train,
         batch_size=config.batch_size,
         collate_fn=ME.utils.batch_sparse_collate,
     )
@@ -305,17 +306,41 @@ def val(net, device, config, phase="val"):
     data_loader = make_data_loader_custom("val", config=config,)
 
     net.eval()
-    labels, preds = [], []
+    labels_val, preds_val = [], []
     with torch.no_grad():
         for batch in data_loader:
             coords, feats, labels = batch
             input = ME.SparseTensor(feats.float(), coords, device="cuda")
             logit = net(input)
             pred = torch.argmax(logit, 1)
-            labels.append(labels.numpy())
-            preds.append(pred.numpy())
+
+            #print("val_labels", labels)
+            #print("val_logit", logit)
+            #print("val_pred", pred)
+            #labels.append(labels.numpy())
+            labels_val.append(labels.cpu().numpy())
+            preds_val.append(pred.cpu().numpy())
             torch.cuda.empty_cache()
-    return metrics.accuracy_score(np.concatenate(labels), np.concatenate(preds))
+    return metrics.accuracy_score(np.concatenate(labels_val), np.concatenate(preds_val))
+
+def test(net, device, config, phase="test"):
+    is_minknet = isinstance(net, ME.MinkowskiNetwork)
+    data_loader = make_data_loader_custom("test", config=config,)
+
+    net.eval()
+    labels_val, preds_val = [], []
+    with torch.no_grad():
+        for batch in data_loader:
+            coords, feats, labels = batch
+            input = ME.SparseTensor(feats.float(), coords, device="cuda")
+            logit = net(input)
+            pred = torch.argmax(logit, 1)
+
+            labels_val.append(labels.cpu().numpy())
+            preds_val.append(pred.cpu().numpy())
+            torch.cuda.empty_cache()
+    return metrics.accuracy_score(np.concatenate(labels_val), np.concatenate(preds_val))
+
 
 
 def train(net, device, config):
