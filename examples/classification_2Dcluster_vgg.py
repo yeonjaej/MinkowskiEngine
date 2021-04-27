@@ -328,18 +328,22 @@ def test(net, device, config, phase="test"):
     data_loader = make_data_loader_custom("test", config=config,)
 
     net.eval()
-    labels_val, preds_val = [], []
+    labels_val, preds_val, sfs_val = [], [], []
     with torch.no_grad():
         for batch in data_loader:
             coords, feats, labels = batch
             input = ME.SparseTensor(feats.float(), coords, device="cuda")
             logit = net(input)
+            sf_val = torch.softmax(logit, dim=1)
             pred = torch.argmax(logit, 1)
 
             labels_val.append(labels.cpu().numpy())
             preds_val.append(pred.cpu().numpy())
+            sfs_val.append(sf_val.cpu().numpy())
             torch.cuda.empty_cache()
-    return metrics.accuracy_score(np.concatenate(labels_val), np.concatenate(preds_val))
+
+    return np.concatenate(labels_val), np.concatenate(preds_val), np.concatenate(sfs_val)
+    #return metrics.accuracy_score(np.concatenate(labels_val), np.concatenate(preds_val))
 
 
 
@@ -408,5 +412,17 @@ if __name__ == "__main__":
     print("=============================================\n\n")
 
     train(net, device, config)
-    accuracy = test(net, device, config, phase="test")
+    y_label, y_pred, y_sf = test(net, device, config, phase="test")
+    accuracy = metrics.accuracy_score(y_label, y_pred)
     print(f"Test accuracy: {accuracy}")
+
+    dim0 = len(y_label)
+    y_label = np.reshape(y_label,(dim0,1))
+    y_pred = np.reshape(y_pred,(dim0,1))
+    y_sf = np.reshape(y_sf,(dim0,2))
+    y_combine = np.hstack((y_label, y_pred, y_sf))
+    #y_pred_sf = torch.softmax(torch.from_numpy(y_pred), dim=2)
+    np.savetxt('label_pred_sf_w_plane.csv',(y_combine), delimiter=' ')
+        #numpy.savetxt("y_pred_sf.csv", y_pred_sf, delimiter=",")
+    #accuracy = test(net, device, config, phase="test")
+
